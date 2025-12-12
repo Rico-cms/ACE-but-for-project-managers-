@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phoenix Project: Arcade Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-def: #3b4cca;
+            --bg-pros: #a22633;
+            --bg-wit: #5d4037;
+            --bg-jud: #2c3e50;
+            --text-box: #000;
+        }
+
+        body { 
+            margin: 0; overflow: hidden; background: #111; 
+            font-family: 'Press Start 2P', cursive; color: white; 
+            height: 100vh; display: flex; flex-direction: column; user-select: none;
+        }
+
+        /* --- CRT EFFECT --- */
+        #screen-container {
+            position: relative; width: 100%; height: 100%; overflow: hidden;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+        }
+        #scanlines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%; pointer-events: none; z-index: 999;
+        }
+
+        /* --- MENUS --- */
+        .menu-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #222; z-index: 2000; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+        }
+        .title-logo {
+            font-size: 3rem; color: #f1c40f; text-shadow: 5px 5px 0 #e74c3c;
+            margin-bottom: 50px; line-height: 1.5;
+        }
+        .level-grid { display: flex; gap: 20px; }
+        .level-card {
+            background: #333; border: 4px solid #fff; padding: 20px; width: 180px;
+            cursor: pointer; transition: transform 0.2s; position: relative;
+        }
+        .level-card:hover:not(.locked) { transform: scale(1.05); background: #444; border-color: #f1c40f; }
+        .level-card.locked { opacity: 0.5; cursor: not-allowed; border-color: #555; }
+        .lock-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
+        .level-title { font-size: 0.7rem; line-height: 1.5; color: #fff; }
+
+        /* --- STAGE --- */
+        #game-stage {
+            flex: 1; position: relative; background: var(--bg-wit);
+            display: flex; justify-content: center; align-items: flex-end;
+            overflow: hidden; transition: background 0.3s;
+            height: 65%; display: none; /* Hidden by default (Menu first) */
+        }
+
+        /* --- CHARACTERS --- */
+        .char-container {
+            position: absolute; bottom: -40px; 
+            width: 400px; height: 500px; display: none;
+            transition: transform 0.2s; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
+        }
+        
+        /* DEFENSE (TOI) */
+        #char-def { left: 5%; }
+        .def-body { position: absolute; bottom: 0; width: 280px; height: 350px; background: #34495e; border-radius: 80px 80px 0 0; }
+        .def-shirt { position: absolute; bottom: 0; left: 110px; width: 60px; height: 350px; background: #fff; }
+        .def-tie { position: absolute; top: 150px; left: 125px; width: 30px; height: 150px; background: #e74c3c; }
+        .def-head { position: absolute; bottom: 320px; left: 60px; width: 160px; height: 180px; background: #ffdbac; border-radius: 60px; }
+        .def-hair { position: absolute; top: -40px; left: -20px; width: 200px; height: 120px; background: #222; clip-path: polygon(0 100%, 20% 0, 50% 20%, 80% 0, 100% 100%); }
+        .def-arm-point { display: none; position: absolute; top: 50px; right: -120px; width: 250px; height: 60px; background: #34495e; transform: rotate(-10deg); border-radius: 30px; }
+        .def-finger { position: absolute; right: -20px; top: 10px; width: 60px; height: 40px; background: #ffdbac; border-radius: 10px; }
+        .pointing .def-arm-point { display: block; animation: point 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+        /* PROSECUTION (VARIOUS) */
+        #char-pros { right: 5%; }
+        .pros-body { position: absolute; bottom: 0; width: 260px; height: 380px; background: #8e44ad; border-radius: 60px 60px 0 0; }
+        .pros-head { position: absolute; bottom: 350px; left: 50px; width: 160px; height: 190px; background: #ffdbac; border-radius: 80px; }
+        .pros-hair { position: absolute; top: -30px; left: -30px; width: 220px; height: 250px; background: #f1c40f; border-radius: 100px 100px 20px 20px; z-index: -1; }
+        .pros-arms { position: absolute; bottom: 120px; left: -20px; width: 300px; height: 70px; background: #6c3483; border-radius: 35px; }
+        .angry .pros-head { background: #ffcccc; animation: shake 0.5s; }
+        
+        /* Level 2: CFO */
+        .char-cfo .pros-body { background: #555; }
+        .char-cfo .pros-arms { background: #333; }
+        .char-cfo .pros-hair { background: #bbb; height: 150px; top: 0; }
+
+        /* Level 3: CEO */
+        .char-ceo .pros-body { background: #000; } /* Black Suit */
+        .char-ceo .pros-arms { background: #000; }
+        .char-ceo .pros-head { border-radius: 40px; background: #e6b0aa; }
+        .char-ceo .pros-hair { background: #7f8c8d; height: 120px; top: -10px; border-radius: 20px 20px 0 0; }
+        .char-ceo .pros-tie { /* Added via pseudo element logic in mind or just imply */ }
+        
+        /* WITNESS (VARIOUS) */
+        #char-wit { left: 50%; transform: translateX(-50%); }
+        .wit-body { position: absolute; bottom: 0; left: 50px; width: 300px; height: 320px; background: #2c3e50; border-radius: 100px 100px 0 0; }
+        .wit-hoodie { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 280px; height: 80px; border-top: 10px solid #1a252f; border-radius: 50%; }
+        .wit-head { position: absolute; bottom: 280px; left: 80px; width: 240px; height: 260px; background: #e6c2a5; border-radius: 70px; }
+        .wit-hair { position: absolute; top: -20px; left: -10px; width: 260px; height: 120px; background: #5d4037; border-radius: 50% 50% 20px 20px; }
+        .wit-glasses { position: absolute; top: 90px; left: 40px; width: 160px; height: 40px; background: rgba(0,0,0,0.8); border-radius: 10px; }
+        .sweating-wit .wit-head::after { content: '💧'; position: absolute; top: 20px; right: 10px; font-size: 3rem; animation: drip 1s infinite; }
+        
+        /* Level 2: Sales */
+        .char-sales .wit-body { background: #d35400; } 
+        .char-sales .wit-hoodie { border-color: #a04000; border-radius: 0; height: 100px; width: 40px; left: 130px; } 
+        .char-sales .wit-glasses { display: none; }
+        .char-sales .wit-hair { background: #000; height: 160px; clip-path: polygon(0 0, 100% 20%, 100% 100%, 0 100%); }
+
+        /* Level 3: Scientist */
+        .char-sci .wit-body { background: #fff; } /* Lab coat */
+        .char-sci .wit-hoodie { display: none; }
+        .char-sci .wit-hair { background: #e74c3c; border-radius: 50% 50% 50% 0; } /* Messy hair */
+        .char-sci .wit-glasses { border-radius: 50%; width: 140px; height: 50px; } /* Goggles */
+
+        /* JUDGE */
+        #char-jud { left: 50%; transform: translateX(-50%); }
+        .jud-body { position: absolute; bottom: 0; left: 50px; width: 300px; height: 350px; background: #000; border-radius: 100px 100px 0 0; }
+        .jud-head { position: absolute; bottom: 320px; left: 80px; width: 240px; height: 200px; background: #e6c2a5; border-radius: 60px; }
+        .jud-wig { position: absolute; top: -40px; left: -20px; width: 280px; height: 180px; background: #ddd; border-radius: 50% 50% 0 0; z-index: -1; }
+        .jud-beard { position: absolute; bottom: -20px; left: 40px; width: 160px; height: 100px; background: #fff; border-radius: 0 0 50px 50px; }
+
+        /* --- SPEEDLINES & FX --- */
+        #speed-lines { position: absolute; top:0; left:0; width:100%; height:100%; opacity: 0; pointer-events: none; z-index: 1; background: repeating-linear-gradient(90deg, transparent 0, transparent 40px, rgba(255,255,255,0.05) 40px, rgba(255,255,255,0.05) 45px); }
+        .zooming #speed-lines { opacity: 1; animation: zoom 0.1s infinite; }
+
+        /* --- UI ELEMENTS --- */
+        #top-ui { position: absolute; top: 0; left: 0; width: 100%; padding: 20px; display: flex; justify-content: space-between; z-index: 20; pointer-events: none; }
+        .btn { pointer-events: auto; background: #111; color: #fff; border: 3px solid #fff; padding: 12px 18px; font-family: 'Press Start 2P'; font-size: 0.7rem; cursor: pointer; box-shadow: 4px 4px 0 #000; transition: transform 0.1s; text-transform: uppercase; }
+        .btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #000; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: #555; color: #555; }
+        .btn-green { border-color: #2ecc71; color: #2ecc71; }
+        .btn-red { border-color: #e74c3c; color: #e74c3c; }
+
+        /* HEARTS */
+        #hp-bar { display: flex; gap: 8px; }
+        .heart { width: 20px; height: 20px; background: #e74c3c; clip-path: polygon(50% 0%, 100% 35%, 82% 100%, 50% 80%, 18% 100%, 0% 35%); animation: pulseHeart 1.5s infinite; }
+        .heart.lost { background: #333; animation: none; }
+
+        /* EVIDENCE BOX */
+        #evidence-box { position: absolute; top: 70px; left: 20px; width: 400px; background: #000; border: 4px solid #fff; padding: 15px; display: none; z-index: 50; pointer-events: auto; box-shadow: 10px 10px 0 rgba(0,0,0,0.8); }
+        .ev-item { display: flex; gap: 10px; padding: 10px; border: 2px solid #333; margin-bottom: 8px; cursor: pointer; align-items: center; transition: all 0.2s; }
+        .ev-item:hover { background: #222; border-color: #e74c3c; transform: translateX(5px); }
+        .ev-icon { font-size: 2rem; }
+        .ev-desc h4 { margin: 0; color: #f1c40f; font-size: 0.7rem; line-height: 1.5; margin-bottom: 5px; }
+        .ev-desc p { margin: 0; font-family: 'VT323'; font-size: 1.1rem; color: #ccc; }
+
+        /* --- DIALOG BOX --- */
+        #dialog-box { height: 35%; background: rgba(0,0,0,0.9); border-top: 4px solid #fff; padding: 30px; position: relative; z-index: 100; box-sizing: border-box; display: none; }
+        #speaker-box { position: absolute; top: -25px; left: 20px; background: #000; border: 4px solid #fff; padding: 5px 15px; font-size: 1rem; text-transform: uppercase; }
+        #text-content { font-family: 'VT323', monospace; font-size: 2.3rem; line-height: 1.2; color: #fff; margin-top: 5px; white-space: pre-wrap; }
+        .text-green { color: #2ecc71; }
+        
+        #next-btn { position: absolute; bottom: 20px; right: 20px; color: #e74c3c; animation: blink 1s infinite; cursor: pointer; font-size: 1.5rem; display: none; }
+
+        /* OVERLAYS */
+        #shout-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; justify-content: center; align-items: center; z-index: 900; pointer-events: none; background: rgba(255,255,255,0.2); }
+        .shout-txt { font-size: 6rem; color: #e74c3c; -webkit-text-stroke: 4px white; text-shadow: 8px 8px 0 #000; animation: impact 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        
+        #phase-tag { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); border: 2px solid #2ecc71; color: #2ecc71; padding: 8px 15px; font-size: 0.8rem; display: none; z-index: 30; box-shadow: 0 0 10px #2ecc71; }
+        #tutorial-bar { position: absolute; bottom: 36%; width: 100%; text-align: center; background: rgba(241, 196, 15, 0.9); color: #000; padding: 10px; font-family: 'VT323'; font-size: 1.6rem; display: none; z-index: 50; border-top: 2px solid #fff; border-bottom: 2px solid #fff; }
+
+        /* END SCREEN */
+        #end-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 1500; display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+        }
+        .end-title { font-size: 3rem; color: #2ecc71; margin-bottom: 30px; }
+        .end-btn-group { display: flex; gap: 20px; }
+
+        @keyframes zoom { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+        @keyframes point { 0% { right: -120px; } 100% { right: -40px; } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+        @keyframes drip { 0% { top: 40px; opacity: 1; } 100% { top: 100px; opacity: 0; } }
+        @keyframes impact { 0% { transform: scale(3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes blink { 50% { opacity: 0; } }
+        @keyframes pulseHeart { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
+        .shake-screen { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+    </style>
+</head>
+<body>
+
+<div id="screen-container">
+    <div id="scanlines"></div>
+
+    <!-- MAIN MENU -->
+    <div id="main-menu" class="menu-screen">
+        <div class="title-logo">PHOENIX<br>PROJECT<br><span style="font-size:1rem; color:#fff;">ARCADE EDITION</span></div>
+        <div class="level-grid">
+            <div class="level-card" onclick="Game.startLevel(1)">
+                <div class="lock-icon">💼</div>
+                <div class="level-title">NIVEAU 1<br>Le Dark Mode</div>
+            </div>
+            <div class="level-card locked" id="lvl-2-card" onclick="Game.startLevel(2)">
+                <div class="lock-icon">🔒</div>
+                <div class="level-title">NIVEAU 2<br>Le Budget</div>
+            </div>
+            <div class="level-card locked" id="lvl-3-card" onclick="Game.startLevel(3)">
+                <div class="lock-icon">🔒</div>
+                <div class="level-title">NIVEAU 3<br>L'Hallucination</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME STAGE -->
+    <div id="game-stage">
+        <div id="speed-lines"></div>
+
+        <!-- CHARACTERS -->
+        <div id="char-def" class="char-container">
+            <div class="def-body"><div class="def-shirt"></div><div class="def-tie"></div></div>
+            <div class="def-head"><div class="def-hair"></div></div>
+            <div class="def-arm-point"><div class="def-finger"></div></div>
+        </div>
+
+        <div id="char-pros" class="char-container">
+            <div class="pros-body"></div>
+            <div class="pros-head"><div class="pros-hair"></div></div>
+            <div class="pros-arms"></div>
+        </div>
+
+        <div id="char-wit" class="char-container">
+            <div class="wit-body"><div class="wit-hoodie"></div></div>
+            <div class="wit-head"><div class="wit-hair"></div><div class="wit-glasses"></div><div class="wit-sweat">💧</div></div>
+        </div>
+
+        <div id="char-jud" class="char-container">
+            <div class="jud-body"></div>
+            <div class="jud-head"><div class="jud-wig"></div><div class="jud-beard"></div></div>
+        </div>
+
+        <!-- OVERLAYS -->
+        <div id="shout-overlay"><div class="shout-txt" id="shout-text">OBJECTION!</div></div>
+        <div id="phase-tag">CONTRE-INTERROGATOIRE</div>
+        <div id="tutorial-bar"></div>
+
+        <!-- UI -->
+        <div id="top-ui">
+            <button class="btn btn-red" id="btn-ev" onclick="Game.toggleEv()" disabled>DOSSIER</button>
+            <div id="hp-bar">
+                <div class="heart" id="hp1"></div><div class="heart" id="hp2"></div>
+                <div class="heart" id="hp3"></div><div class="heart" id="hp4"></div><div class="heart" id="hp5"></div>
+            </div>
+            <button class="btn btn-green" id="btn-press" onclick="Game.press()" disabled>ATTAQUER</button>
+        </div>
+
+        <div id="evidence-box">
+            <div style="text-align:center; margin-bottom:10px; border-bottom:1px solid #fff; color:#ccc;">PIÈCES À CONVICTION</div>
+            <div id="ev-list"></div>
+            <button class="btn" onclick="Game.toggleEv()" style="width:100%; margin-top:10px;">FERMER</button>
+        </div>
+    </div>
+
+    <!-- DIALOG BOX -->
+    <div id="dialog-box">
+        <div id="speaker-box">SYSTEM</div>
+        <div id="text-content"></div>
+        <div id="next-btn" onclick="Game.next()">▼</div>
+    </div>
+
+    <!-- END MENU -->
+    <div id="end-screen">
+        <div class="end-title" id="end-title">VICTOIRE !</div>
+        <div class="end-btn-group">
+            <button class="btn" onclick="Game.returnToMenu()">MENU PRINCIPAL</button>
+            <button class="btn btn-green" id="next-lvl-btn" onclick="Game.startNextLevel()">NIVEAU SUIVANT</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- LEVEL DATA ---
+    const LEVELS = {
+        1: {
+            title: "Le Dark Mode",
+            opponent: "Sarah", // Client
+            witness: "Marc", // Dev
+            evidence: [
+                { id: "email", name: "EMAIL (23H42)", icon: "📧", desc: "De: Sarah. 'JE VEUX LE DARK MODE !!'" },
+                { id: "logs", name: "GIT LOGS", icon: "💾", desc: "Commit à 03h00. 'Hotfix CSS'." },
+                { id: "contrat", name: "CONTRAT", icon: "📄", desc: "Pas de Dark Mode prévu." }
+            ],
+            intro: [
+                { v: 'jud', s: "Juge", t: "Le client accuse l'équipe d'avoir cassé le site en prod." },
+                { v: 'pros', s: "Sarah", t: "Je suis innocente ! Ils ont codé n'importe quoi !" },
+                { v: 'wit', s: "Marc", t: "Je... J'ai fait de mon mieux...", pose:'scared' }
+            ],
+            cross: [
+                { id: 0, v: 'pros', s: "Sarah", t: "1. Votre développeur a modifié le code cette nuit sans raison." },
+                { id: 1, v: 'pros', s: "Sarah", t: "2. Je n'ai absolument RIEN demandé de spécial hier soir.", weak: true }, 
+                { id: 2, v: 'pros', s: "Sarah", t: "3. Ce crash est donc 100% de votre faute." }
+            ],
+            winCondition: { idx: 1, evId: 'email' },
+            winScene: [
+                { v: 'def', s: "Toi", t: "Rien demandé ? Voici votre EMAIL de 23h42 !", pose:'point' },
+                { v: 'pros', s: "Sarah", t: "AAAAARGH !!!", pose:'angry' },
+                { v: 'wit', s: "Marc", t: "Elle m'a menacé... J'ai dû coder ça en urgence." },
+                { v: 'jud', s: "Juge", t: "Le client est responsable. VICTOIRE !" }
+            ]
+        },
+        2: {
+            title: "Le Budget Fantôme",
+            opponent: "Finances", // CFO
+            witness: "Alex", // Sales
+            evidence: [
+                { id: "invoice", name: "FACTURE AWS", icon: "💸", desc: "15 000€ de GPU en un mois." },
+                { id: "brochure", name: "BROCHURE", icon: "📰", desc: "Vendue par Alex. Mentionne 'IA Générative'." },
+                { id: "budget", name: "BUDGET IT", icon: "📊", desc: "Validé pour un site web statique." }
+            ],
+            intro: [
+                { v: 'jud', s: "Juge", t: "La Direction Financière accuse la Tech de faillite." },
+                { v: 'pros', s: "Finances", t: "Vous brûlez du cash avec des serveurs inutiles !" },
+                { v: 'wit', s: "Alex", t: "Moi ? Je vends, c'est tout. La technique, c'est pas mon rayon.", pose:'scared' }
+            ],
+            cross: [
+                { id: 0, v: 'wit', s: "Alex", t: "1. J'ai vendu le produit standard, comme d'habitude." },
+                { id: 1, v: 'wit', s: "Alex", t: "2. Je n'ai jamais promis de fonctionnalités IA au client.", weak: true }, 
+                { id: 2, v: 'wit', s: "Alex", t: "3. Ces serveurs GPU, c'est le délire des développeurs." }
+            ],
+            winCondition: { idx: 1, evId: 'brochure' },
+            winScene: [
+                { v: 'def', s: "Toi", t: "Pas d'IA ? Regardez cette BROCHURE signée !", pose:'point' },
+                { v: 'def', s: "Toi", t: "'Génération d'images par IA incluse'. C'est écrit en gros !" },
+                { v: 'wit', s: "Alex", t: "Mais... c'était juste pour attirer le client !", pose:'scared' },
+                { v: 'pros', s: "Finances", t: "QUOI ?! Vous avez vendu ça sans budget ?!", pose:'angry' },
+                { v: 'jud', s: "Juge", t: "Le commercial paiera la facture. VICTOIRE !" }
+            ]
+        },
+        3: {
+            title: "L'Hallucination",
+            opponent: "Le PDG", // CEO
+            witness: "Chloé", // Data Scientist
+            evidence: [
+                { id: "chatlog", name: "LOG DE CHAT #12", icon: "💬", desc: "L'IA promettant des iPhones gratuits." },
+                { id: "test", name: "RAPPORT TEST", icon: "📉", desc: "Couverture de test: 1%." },
+                { id: "memo", name: "NOTE SERVICE", icon: "📝", desc: "Objectif: Remplacer le support par l'IA." }
+            ],
+            intro: [
+                { v: 'jud', s: "Juge", t: "Le PDG veut licencier le support client et le remplacer par une IA." },
+                { v: 'pros', s: "Le PDG", t: "Mon IA est parfaite. Elle ne coûte rien et ne dort jamais." },
+                { v: 'wit', s: "Chloé", t: "Le modèle est... encore expérimental...", pose:'scared' }
+            ],
+            cross: [
+                { id: 0, v: 'pros', s: "Le PDG", t: "1. Cette IA a été testée rigoureusement par mes soins." },
+                { id: 1, v: 'pros', s: "Le PDG", t: "2. Elle répond parfaitement à toutes les demandes des clients.", weak: true },
+                { id: 2, v: 'pros', s: "Le PDG", t: "3. Il n'y a aucun risque pour l'entreprise." }
+            ],
+            winCondition: { idx: 1, evId: 'chatlog' },
+            winScene: [
+                { v: 'def', s: "Toi", t: "Parfaitement ? Lisez ce LOG DE CHAT !", pose:'point' },
+                { v: 'def', s: "Toi", t: "L'IA a promis 5000 iPhones gratuits à un client mécontent !" },
+                { v: 'pros', s: "Le PDG", t: "Quoi ?! C'est impossible !", pose:'angry' },
+                { v: 'wit', s: "Chloé", t: "Je vous avais dit qu'elle hallucinait sur les promos..." },
+                { v: 'jud', s: "Juge", t: "Cette IA est un danger public. Projet annulé. VICTOIRE !" }
+            ]
+        }
+    };
+
+    // --- GAME ENGINE ---
+    const Game = {
+        currentLevel: 1,
+        unlockedLevel: 1,
+        state: 'MENU', 
+        step: 0,
+        crossIdx: 0,
+        hp: 5,
+        currentScript: null,
+        typeInterval: null,
+        isTyping: false,
+
+        init: function() {
+            this.showMenu();
+        },
+
+        showMenu: function() {
+            document.getElementById('main-menu').style.display = 'flex';
+            document.getElementById('game-stage').style.display = 'none';
+            document.getElementById('dialog-box').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'none';
+            
+            // Update Locks
+            const lvl2 = document.getElementById('lvl-2-card');
+            const lvl3 = document.getElementById('lvl-3-card');
+            
+            if(this.unlockedLevel >= 2) {
+                lvl2.classList.remove('locked');
+                lvl2.innerHTML = '<div class="lock-icon">💼</div><div class="level-title">NIVEAU 2<br>Le Budget</div>';
+            }
+            if(this.unlockedLevel >= 3) {
+                lvl3.classList.remove('locked');
+                lvl3.innerHTML = '<div class="lock-icon">🤖</div><div class="level-title">NIVEAU 3<br>L\'Hallucination</div>';
+            }
+        },
+
+        startLevel: function(lvl) {
+            if(lvl > this.unlockedLevel) return;
+            
+            this.currentLevel = lvl;
+            this.hp = 5;
+            this.resetHP();
+            this.updateCharStyles(); 
+            
+            document.getElementById('main-menu').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('game-stage').style.display = 'flex';
+            document.getElementById('dialog-box').style.display = 'block';
+            
+            this.renderEv();
+            this.playScript(LEVELS[lvl].intro, 'INTRO');
+        },
+        
+        startNextLevel: function() {
+            this.startLevel(this.currentLevel + 1);
+        },
+
+        updateCharStyles: function() {
+            const wit = document.getElementById('char-wit');
+            const pros = document.getElementById('char-pros');
+            
+            // Reset classes
+            wit.className = "char-container";
+            pros.className = "char-container";
+            
+            if(this.currentLevel === 2) {
+                wit.classList.add('char-sales'); 
+                pros.classList.add('char-cfo'); 
+            } else if (this.currentLevel === 3) {
+                wit.classList.add('char-sci'); // Scientist
+                pros.classList.add('char-ceo'); // CEO
+            }
+        },
+
+        // --- NAVIGATION ---
+        next: function() {
+            if (this.isTyping) { this.completeText(); return; }
+
+            if (this.state === 'INTRO' || this.state === 'DIALOG') {
+                this.step++;
+                if (this.step < this.currentScript.length) {
+                    this.renderFrame(this.currentScript[this.step]);
+                } else {
+                    this.endSequence();
+                }
+            } 
+            else if (this.state === 'CROSS') {
+                const script = LEVELS[this.currentLevel].cross;
+                this.crossIdx = (this.crossIdx + 1) % script.length;
+                this.renderFrame(script[this.crossIdx]);
+                this.updateCrossUI();
+            }
+        },
+
+        endSequence: function() {
+            if (this.state === 'INTRO') {
+                this.startCross();
+            }
+            else if (this.state === 'DIALOG') {
+                if (this.currentScript === LEVELS[this.currentLevel].winScene) {
+                    this.winGame();
+                } else {
+                    // Return to cross
+                    this.state = 'CROSS';
+                    this.renderFrame(LEVELS[this.currentLevel].cross[this.crossIdx]);
+                    this.updateUI(true);
+                }
+            }
+        },
+
+        startCross: function() {
+            this.state = 'CROSS';
+            this.crossIdx = 0;
+            this.shout("CONTRE-INTERROGATOIRE");
+            document.getElementById('phase-tag').style.display = 'block';
+            document.getElementById('tutorial-bar').style.display = 'block';
+            document.getElementById('tutorial-bar').innerText = "CONSEIL: Défilez avec ▶ et PRÉSENTEZ une PREUVE sur le mensonge.";
+            
+            setTimeout(() => {
+                this.renderFrame(LEVELS[this.currentLevel].cross[0]);
+                this.updateUI(true);
+            }, 1000);
+        },
+
+        playScript: function(script, stateName = 'DIALOG') {
+            this.state = stateName;
+            this.currentScript = script;
+            this.step = 0;
+            this.renderFrame(script[0]);
+            this.updateUI(false);
+        },
+
+        // --- ACTIONS ---
+        toggleEv: function() {
+            const el = document.getElementById('evidence-box');
+            el.style.display = el.style.display === 'block' ? 'none' : 'block';
+        },
+
+        press: function() {
+            this.shout("UN INSTANT !", "blue");
+            setTimeout(() => {
+                const lvl = LEVELS[this.currentLevel];
+                const speaker = (lvl.cross[this.crossIdx].v === 'wit') ? 'wit' : 'pros';
+                const name = (speaker === 'wit') ? lvl.witness : lvl.opponent;
+                
+                const dialog = [
+                    { v: 'def', s: "Toi", t: "Êtes-vous absolument certain de ce point ?" },
+                    { v: speaker, s: name, t: "Oui ! C'est la stricte vérité !", pose: 'angry' }
+                ];
+                this.playScript(dialog);
+            }, 800);
+        },
+
+        present: function(evId) {
+            this.toggleEv();
+            const lvl = LEVELS[this.currentLevel];
+            
+            if (this.crossIdx === lvl.winCondition.idx && evId === lvl.winCondition.evId) {
+                this.shout("PRENDS ÇA !");
+                document.getElementById('speed-lines').classList.add('zooming');
+                document.getElementById('tutorial-bar').style.display = 'none';
+                setTimeout(() => {
+                    this.playScript(lvl.winScene);
+                }, 1000);
+            } else {
+                this.shout("EUH...");
+                this.takeDamage();
+                const failScript = [{ v: 'jud', s: "Juge", t: "Cette preuve ne contredit pas la phrase actuelle." }];
+                setTimeout(() => this.playScript(failScript), 800);
+            }
+        },
+
+        takeDamage: function() {
+            const hp = document.getElementById(`hp${this.hp}`);
+            if(hp) hp.classList.add('lost');
+            this.hp--;
+            document.getElementById('game-stage').classList.add('shake-screen');
+            setTimeout(() => document.getElementById('game-stage').classList.remove('shake-screen'), 500);
+            
+            if(this.hp <= 0) {
+                alert("GAME OVER");
+                this.showMenu();
+            }
+        },
+
+        winGame: function() {
+            if(this.currentLevel === this.unlockedLevel && this.currentLevel < 3) this.unlockedLevel++;
+            
+            const screen = document.getElementById('end-screen');
+            const nextBtn = document.getElementById('next-lvl-btn');
+            
+            screen.style.display = 'flex';
+            if(this.currentLevel >= 3) nextBtn.style.display = 'none'; 
+            else nextBtn.style.display = 'block';
+        },
+
+        returnToMenu: function() {
+            this.showMenu();
+        },
+
+        resetHP: function() {
+            for(let i=1; i<=5; i++) document.getElementById(`hp${i}`).classList.remove('lost');
+        },
+
+        // --- RENDER ---
+        renderFrame: function(f) {
+            // Visuals
+            const stage = document.getElementById('game-stage');
+            document.querySelectorAll('.char-container').forEach(e => e.style.display = 'none');
+            
+            // Reset anims
+            document.getElementById('char-def').className = "char-container";
+            document.getElementById('char-pros').className = "char-container";
+            document.getElementById('char-wit').className = "char-container";
+            this.updateCharStyles(); // Re-apply specific level styles
+
+            if (f.v === 'def') {
+                stage.style.background = 'var(--bg-def)';
+                document.getElementById('char-def').style.display = 'block';
+                if(f.pose === 'point') document.getElementById('char-def').classList.add('pointing');
+            } else if (f.v === 'pros') {
+                stage.style.background = 'var(--bg-pros)';
+                document.getElementById('char-pros').style.display = 'block';
+                if(f.pose === 'angry') document.getElementById('char-pros').classList.add('angry');
+                if(f.pose === 'scared') document.getElementById('char-pros').classList.add('sweating-pros');
+            } else if (f.v === 'wit') {
+                stage.style.background = 'var(--bg-wit)';
+                document.getElementById('char-wit').style.display = 'block';
+                if(f.pose === 'scared') document.getElementById('char-wit').classList.add('sweating-wit');
+            } else {
+                stage.style.background = 'var(--bg-jud)';
+                document.getElementById('char-jud').style.display = 'block';
+            }
+
+            // Text
+            const sb = document.getElementById('speaker-box');
+            sb.innerText = f.s;
+            sb.style.borderColor = (f.s === "Toi") ? "#5dade2" : ((f.v === "pros") ? "#a93226" : "#fff");
+            sb.style.color = sb.style.borderColor;
+
+            this.typeWriter(f.t, f.weak);
+        },
+
+        typeWriter: function(text, isWeak) {
+            const el = document.getElementById('text-content');
+            el.innerHTML = "";
+            el.className = isWeak ? 'text-green' : ''; 
+            this.isTyping = true;
+            document.getElementById('next-btn').style.display = 'none';
+
+            let i = 0;
+            clearInterval(this.typeInterval);
+            this.typeInterval = setInterval(() => {
+                el.textContent += text.charAt(i);
+                i++;
+                if (i >= text.length) this.completeText();
+            }, 20);
+        },
+
+        completeText: function() {
+            clearInterval(this.typeInterval);
+            this.isTyping = false;
+            document.getElementById('next-btn').style.display = 'block';
+        },
+
+        updateUI: function(isCross) {
+            document.getElementById('btn-press').disabled = !isCross;
+            document.getElementById('btn-ev').disabled = !isCross;
+            document.getElementById('next-btn').innerText = isCross ? "▶" : "▼";
+            document.getElementById('phase-tag').style.display = isCross ? 'block' : 'none';
+        },
+
+        updateCrossUI: function() {
+            document.getElementById('phase-tag').innerText = `DÉPOSITION ${this.crossIdx + 1}/3`;
+        },
+
+        renderEv: function() {
+            const l = document.getElementById('ev-list');
+            l.innerHTML = "";
+            LEVELS[this.currentLevel].evidence.forEach(ev => {
+                const d = document.createElement('div');
+                d.className = 'ev-item';
+                d.innerHTML = `<div class="ev-icon">${ev.icon}</div><div class="ev-desc"><h4>${ev.name}</h4><p>${ev.desc}</p></div>`;
+                d.onclick = () => this.present(ev.id);
+                l.appendChild(d);
+            });
+        },
+
+        shout: function(txt, color) {
+            const o = document.getElementById('shout-overlay');
+            const t = document.getElementById('shout-text');
+            t.innerText = txt;
+            t.className = 'shout-txt ' + (color === 'blue' ? 'shout-blue' : '');
+            o.style.display = 'flex';
+            setTimeout(() => o.style.display = 'none', 800);
+        }
+    };
+
+    window.onload = () => Game.init();
+
+</script>
+</body>
+</html>
