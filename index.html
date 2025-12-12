@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Phoenix Project: Arcade Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
     <style>
@@ -18,6 +18,8 @@
             margin: 0; overflow: hidden; background: #111; 
             font-family: 'Press Start 2P', cursive; color: white; 
             height: 100vh; display: flex; flex-direction: column; user-select: none;
+            /* Prevent pull-to-refresh on mobile */
+            overscroll-behavior: none;
         }
 
         /* --- CRT EFFECT --- */
@@ -36,17 +38,23 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #222; z-index: 2000; display: flex; flex-direction: column;
             justify-content: center; align-items: center; text-align: center;
+            overflow-y: auto; /* Allow scroll on small landscape screens */
         }
         .title-logo {
             font-size: 3rem; color: #f1c40f; text-shadow: 5px 5px 0 #e74c3c;
             margin-bottom: 50px; line-height: 1.5;
         }
-        .level-grid { display: flex; gap: 20px; }
+        .level-grid { 
+            display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; 
+            max-width: 100%; padding: 20px;
+        }
         .level-card {
             background: #333; border: 4px solid #fff; padding: 20px; width: 180px;
             cursor: pointer; transition: transform 0.2s; position: relative;
+            flex-shrink: 0;
         }
         .level-card:hover:not(.locked) { transform: scale(1.05); background: #444; border-color: #f1c40f; }
+        .level-card:active:not(.locked) { transform: scale(0.95); }
         .level-card.locked { opacity: 0.5; cursor: not-allowed; border-color: #555; }
         .lock-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
         .level-title { font-size: 0.7rem; line-height: 1.5; color: #fff; }
@@ -60,10 +68,13 @@
         }
 
         /* --- CHARACTERS --- */
+        /* BASE CONTAINER */
         .char-container {
             position: absolute; bottom: -40px; 
             width: 400px; height: 500px; display: none;
             transition: transform 0.2s; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
+            /* Responsive Scaling Origin */
+            transform-origin: bottom center; 
         }
         
         /* DEFENSE (TOI) */
@@ -91,12 +102,11 @@
         .char-cfo .pros-hair { background: #bbb; height: 150px; top: 0; }
 
         /* Level 3: CEO */
-        .char-ceo .pros-body { background: #000; } /* Black Suit */
+        .char-ceo .pros-body { background: #000; } 
         .char-ceo .pros-arms { background: #000; }
         .char-ceo .pros-head { border-radius: 40px; background: #e6b0aa; }
         .char-ceo .pros-hair { background: #7f8c8d; height: 120px; top: -10px; border-radius: 20px 20px 0 0; }
-        .char-ceo .pros-tie { /* Added via pseudo element logic in mind or just imply */ }
-        
+
         /* WITNESS (VARIOUS) */
         #char-wit { left: 50%; transform: translateX(-50%); }
         .wit-body { position: absolute; bottom: 0; left: 50px; width: 300px; height: 320px; background: #2c3e50; border-radius: 100px 100px 0 0; }
@@ -113,10 +123,10 @@
         .char-sales .wit-hair { background: #000; height: 160px; clip-path: polygon(0 0, 100% 20%, 100% 100%, 0 100%); }
 
         /* Level 3: Scientist */
-        .char-sci .wit-body { background: #fff; } /* Lab coat */
+        .char-sci .wit-body { background: #fff; } 
         .char-sci .wit-hoodie { display: none; }
-        .char-sci .wit-hair { background: #e74c3c; border-radius: 50% 50% 50% 0; } /* Messy hair */
-        .char-sci .wit-glasses { border-radius: 50%; width: 140px; height: 50px; } /* Goggles */
+        .char-sci .wit-hair { background: #e74c3c; border-radius: 50% 50% 50% 0; } 
+        .char-sci .wit-glasses { border-radius: 50%; width: 140px; height: 50px; } 
 
         /* JUDGE */
         #char-jud { left: 50%; transform: translateX(-50%); }
@@ -130,20 +140,33 @@
         .zooming #speed-lines { opacity: 1; animation: zoom 0.1s infinite; }
 
         /* --- UI ELEMENTS --- */
-        #top-ui { position: absolute; top: 0; left: 0; width: 100%; padding: 20px; display: flex; justify-content: space-between; z-index: 20; pointer-events: none; }
-        .btn { pointer-events: auto; background: #111; color: #fff; border: 3px solid #fff; padding: 12px 18px; font-family: 'Press Start 2P'; font-size: 0.7rem; cursor: pointer; box-shadow: 4px 4px 0 #000; transition: transform 0.1s; text-transform: uppercase; }
+        #top-ui { 
+            position: absolute; top: 0; left: 0; width: 100%; padding: 20px; box-sizing: border-box;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            z-index: 20; pointer-events: none; 
+        }
+        
+        .btn { 
+            pointer-events: auto; background: #111; color: #fff; border: 3px solid #fff; 
+            padding: 12px 18px; font-family: 'Press Start 2P'; font-size: 0.7rem; cursor: pointer; 
+            box-shadow: 4px 4px 0 #000; transition: transform 0.1s; text-transform: uppercase; 
+        }
         .btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #000; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: #555; color: #555; }
         .btn-green { border-color: #2ecc71; color: #2ecc71; }
         .btn-red { border-color: #e74c3c; color: #e74c3c; }
 
         /* HEARTS */
-        #hp-bar { display: flex; gap: 8px; }
+        #hp-bar { display: flex; gap: 8px; margin-top: 5px; }
         .heart { width: 20px; height: 20px; background: #e74c3c; clip-path: polygon(50% 0%, 100% 35%, 82% 100%, 50% 80%, 18% 100%, 0% 35%); animation: pulseHeart 1.5s infinite; }
         .heart.lost { background: #333; animation: none; }
 
         /* EVIDENCE BOX */
-        #evidence-box { position: absolute; top: 70px; left: 20px; width: 400px; background: #000; border: 4px solid #fff; padding: 15px; display: none; z-index: 50; pointer-events: auto; box-shadow: 10px 10px 0 rgba(0,0,0,0.8); }
+        #evidence-box { 
+            position: absolute; top: 80px; left: 20px; width: 400px; max-width: 90%;
+            background: #000; border: 4px solid #fff; padding: 15px; display: none; 
+            z-index: 50; pointer-events: auto; box-shadow: 10px 10px 0 rgba(0,0,0,0.8); 
+        }
         .ev-item { display: flex; gap: 10px; padding: 10px; border: 2px solid #333; margin-bottom: 8px; cursor: pointer; align-items: center; transition: all 0.2s; }
         .ev-item:hover { background: #222; border-color: #e74c3c; transform: translateX(5px); }
         .ev-icon { font-size: 2rem; }
@@ -151,19 +174,40 @@
         .ev-desc p { margin: 0; font-family: 'VT323'; font-size: 1.1rem; color: #ccc; }
 
         /* --- DIALOG BOX --- */
-        #dialog-box { height: 35%; background: rgba(0,0,0,0.9); border-top: 4px solid #fff; padding: 30px; position: relative; z-index: 100; box-sizing: border-box; display: none; }
-        #speaker-box { position: absolute; top: -25px; left: 20px; background: #000; border: 4px solid #fff; padding: 5px 15px; font-size: 1rem; text-transform: uppercase; }
-        #text-content { font-family: 'VT323', monospace; font-size: 2.3rem; line-height: 1.2; color: #fff; margin-top: 5px; white-space: pre-wrap; }
+        #dialog-box { 
+            height: 35%; background: rgba(0,0,0,0.9); border-top: 4px solid #fff; 
+            padding: 30px; position: relative; z-index: 100; box-sizing: border-box; display: none; 
+        }
+        #speaker-box { 
+            position: absolute; top: -25px; left: 20px; background: #000; border: 4px solid #fff; 
+            padding: 5px 15px; font-size: 1rem; text-transform: uppercase; white-space: nowrap;
+        }
+        #text-content { 
+            font-family: 'VT323', monospace; font-size: 2.3rem; line-height: 1.2; 
+            color: #fff; margin-top: 5px; white-space: pre-wrap; 
+        }
         .text-green { color: #2ecc71; }
         
-        #next-btn { position: absolute; bottom: 20px; right: 20px; color: #e74c3c; animation: blink 1s infinite; cursor: pointer; font-size: 1.5rem; display: none; }
+        #next-btn { 
+            position: absolute; bottom: 20px; right: 20px; color: #e74c3c; 
+            animation: blink 1s infinite; cursor: pointer; font-size: 1.5rem; display: none; 
+        }
 
         /* OVERLAYS */
         #shout-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; justify-content: center; align-items: center; z-index: 900; pointer-events: none; background: rgba(255,255,255,0.2); }
-        .shout-txt { font-size: 6rem; color: #e74c3c; -webkit-text-stroke: 4px white; text-shadow: 8px 8px 0 #000; animation: impact 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .shout-txt { font-size: 6rem; color: #e74c3c; -webkit-text-stroke: 4px white; text-shadow: 8px 8px 0 #000; animation: impact 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
         
-        #phase-tag { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); border: 2px solid #2ecc71; color: #2ecc71; padding: 8px 15px; font-size: 0.8rem; display: none; z-index: 30; box-shadow: 0 0 10px #2ecc71; }
-        #tutorial-bar { position: absolute; bottom: 36%; width: 100%; text-align: center; background: rgba(241, 196, 15, 0.9); color: #000; padding: 10px; font-family: 'VT323'; font-size: 1.6rem; display: none; z-index: 50; border-top: 2px solid #fff; border-bottom: 2px solid #fff; }
+        #phase-tag { 
+            position: absolute; top: 70px; left: 50%; transform: translateX(-50%); 
+            background: rgba(0,0,0,0.9); border: 2px solid #2ecc71; color: #2ecc71; 
+            padding: 8px 15px; font-size: 0.8rem; display: none; z-index: 30; box-shadow: 0 0 10px #2ecc71; 
+            white-space: nowrap;
+        }
+        #tutorial-bar { 
+            position: absolute; bottom: 36%; width: 100%; text-align: center; 
+            background: rgba(241, 196, 15, 0.9); color: #000; padding: 10px; box-sizing: border-box;
+            font-family: 'VT323'; font-size: 1.6rem; display: none; z-index: 50; border-top: 2px solid #fff; border-bottom: 2px solid #fff; 
+        }
 
         /* END SCREEN */
         #end-screen {
@@ -171,9 +215,10 @@
             background: rgba(0,0,0,0.9); z-index: 1500; display: none;
             flex-direction: column; justify-content: center; align-items: center;
         }
-        .end-title { font-size: 3rem; color: #2ecc71; margin-bottom: 30px; }
-        .end-btn-group { display: flex; gap: 20px; }
+        .end-title { font-size: 3rem; color: #2ecc71; margin-bottom: 30px; text-align: center; }
+        .end-btn-group { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
 
+        /* --- ANIMATIONS --- */
         @keyframes zoom { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
         @keyframes point { 0% { right: -120px; } 100% { right: -40px; } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
@@ -183,6 +228,51 @@
         @keyframes pulseHeart { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 
         .shake-screen { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+        /* --- RESPONSIVE MEDIA QUERIES --- */
+        @media (max-width: 768px) {
+            /* General Sizing */
+            .title-logo { font-size: 2rem; margin-bottom: 30px; }
+            .level-grid { flex-direction: column; align-items: center; gap: 15px; }
+            .level-card { width: 80%; padding: 15px; }
+            
+            /* Characters Scaling (Crucial for fixed pixel art) */
+            .char-container {
+                transform: scale(0.65); /* Shrink characters */
+                bottom: -10px;
+            }
+            
+            /* UI Buttons */
+            #top-ui { padding: 10px; }
+            .btn { padding: 8px 10px; font-size: 0.55rem; border-width: 2px; }
+            #hp-bar { gap: 4px; }
+            .heart { width: 15px; height: 15px; }
+
+            /* Text Sizes */
+            #text-content { font-size: 1.4rem; }
+            #speaker-box { font-size: 0.8rem; padding: 3px 10px; top: -20px; }
+            #tutorial-bar { font-size: 1.1rem; padding: 5px; }
+            #phase-tag { font-size: 0.6rem; top: 60px; }
+
+            /* Overlays */
+            #evidence-box { top: 60px; left: 5%; width: 90%; padding: 10px; }
+            .ev-icon { font-size: 1.5rem; }
+            .ev-desc p { font-size: 1rem; }
+            
+            .shout-txt { font-size: 3rem; -webkit-text-stroke: 2px white; text-shadow: 4px 4px 0 #000; }
+            
+            #dialog-box { padding: 15px; }
+            #next-btn { font-size: 1.2rem; bottom: 10px; right: 10px; }
+
+            .end-title { font-size: 2rem; }
+        }
+
+        /* Very small screens */
+        @media (max-width: 380px) {
+            .char-container { transform: scale(0.55); }
+            #text-content { font-size: 1.2rem; }
+            .level-title { font-size: 0.6rem; }
+        }
 
     </style>
 </head>
